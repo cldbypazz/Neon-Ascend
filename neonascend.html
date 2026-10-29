@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Ascend - 2D Vertical Parkour</title>
+    <!-- Tailwind CSS for modern UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for futuristic synthwave typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #05020a;
+            color: #ffffff;
+            overflow: hidden;
+            touch-action: none;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        .neon-glow-cyan {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(0, 240, 255, 0.4);
+        }
+        .neon-glow-pink {
+            text-shadow: 0 0 10px rgba(255, 0, 127, 0.8), 0 0 20px rgba(255, 0, 127, 0.4);
+        }
+        .neon-box-cyan {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5), inset 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+        .neon-box-pink {
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.5), inset 0 0 15px rgba(255, 0, 127, 0.2);
+        }
+        canvas {
+            display: block;
+            background: radial-gradient(circle at center, #130b29 0%, #05020a 100%);
+        }
+        /* Custom scrollbar for menus if needed */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00f0ff;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen flex flex-col items-center justify-center select-none">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
+
+    <!-- HUD Overlay (Hidden during start screen) -->
+    <div id="hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-6 z-10 hidden">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-center w-full max-w-5xl mx-auto">
+            <!-- Score & Height -->
+            <div class="flex gap-4 md:gap-8 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-cyan-500/30 neon-box-cyan pointer-events-auto">
+                <div>
+                    <p class="text-xs text-cyan-400 font-orbitron">HEIGHT</p>
+                    <p id="hudHeight" class="text-xl md:text-2xl font-black font-orbitron text-white">0m</p>
+                </div>
+                <div class="border-l border-cyan-500/30 pl-4">
+                    <p class="text-xs text-yellow-400 font-orbitron">SCORE</p>
+                    <p id="hudScore" class="text-xl md:text-2xl font-black font-orbitron text-yellow-300">0</p>
+                </div>
+                <div class="border-l border-cyan-500/30 pl-4">
+                    <p class="text-xs text-pink-400 font-orbitron">GEMS</p>
+                    <p id="hudGems" class="text-xl md:text-2xl font-black font-orbitron text-pink-400">0</p>
+                </div>
+            </div>
+
+            <!-- Right Controls / Pause & Respawns -->
+            <div class="flex items-center gap-3 pointer-events-auto">
+                <!-- Respawns Display -->
+                <div class="flex items-center gap-2 bg-black/60 border border-pink-500/40 px-3 py-1.5 rounded-xl backdrop-blur-md">
+                    <span class="text-xs font-orbitron text-pink-400">RESPAWNS:</span>
+                    <div id="respawnHearts" class="flex gap-1 text-sm">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+
+                <div id="hudCheckpoint" class="hidden md:flex items-center gap-2 bg-blue-950/80 border border-blue-500/50 px-3 py-1.5 rounded-lg text-xs font-orbitron text-blue-300">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping"></span>
+                    CHECKPOINT ACTIVE
+                </div>
+                <button id="pauseBtn" class="bg-black/60 hover:bg-cyan-950/80 text-cyan-400 border border-cyan-500/50 px-4 py-2 rounded-xl font-orbitron text-sm transition shadow-lg active:scale-95">
+                    PAUSE
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom Indicators & Mobile Controls -->
+        <div class="flex justify-between items-end w-full max-w-5xl mx-auto pb-2">
+            <!-- Jump Status Indicator -->
+            <div class="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-pink-500/30 pointer-events-auto flex items-center gap-3">
+                <span class="text-xs font-orbitron text-pink-400">JUMP POWER:</span>
+                <div class="flex gap-1.5" id="jumpIndicators">
+                    <div id="jump1" class="w-4 h-4 rounded-full bg-cyan-400 neon-box-cyan transition-all"></div>
+                    <div id="jump2" class="w-4 h-4 rounded-full bg-cyan-400 neon-box-cyan transition-all"></div>
+                </div>
+            </div>
+
+            <!-- On-Screen Mobile Touch Controls -->
+            <div id="mobileControls" class="flex md:hidden gap-3 pointer-events-auto">
+                <button id="touchLeft" class="w-16 h-16 bg-black/60 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 text-2xl active:bg-cyan-500/30">◀</button>
+                <button id="touchRight" class="w-16 h-16 bg-black/60 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 text-2xl active:bg-cyan-500/30">▶</button>
+                <button id="touchJump" class="w-20 h-16 bg-pink-600/60 border border-pink-400 rounded-2xl flex items-center justify-center text-white font-orbitron text-sm active:bg-pink-500">JUMP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Menu Modal -->
+    <div id="startScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md p-6">
+        <div class="text-center max-w-xl mx-auto space-y-6">
+            <h1 class="text-5xl md:text-7xl font-black font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 neon-glow-cyan">
+                NEON ASCEND
+            </h1>
+            <p class="text-gray-300 text-sm md:text-base font-medium">
+                Conquer the infinite vertical heights. Master double jumps, dodge lethal laser spikes, claim neon gems, and reach checkpoints!
+            </p>
+
+            <!-- Difficulty Selector -->
+            <div class="flex flex-col gap-2 max-w-xs mx-auto">
+                <label class="text-xs font-orbitron text-cyan-400 tracking-wider">SELECT DIFFICULTY</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button data-diff="easy" class="diff-btn py-2.5 rounded-lg border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 font-orbitron text-xs font-bold transition hover:bg-cyan-500 hover:text-black">EASY</button>
+                    <button data-diff="normal" class="diff-btn py-2.5 rounded-lg border border-pink-500/60 bg-pink-950/60 text-pink-300 font-orbitron text-xs font-bold transition shadow-lg ring-2 ring-pink-500">NORMAL</button>
+                    <button data-diff="hard" class="diff-btn py-2.5 rounded-lg border border-purple-500/40 bg-purple-950/30 text-purple-300 font-orbitron text-xs font-bold transition hover:bg-purple-500 hover:text-black">HARD</button>
+                </div>
+            </div>
+
+            <!-- Play Button -->
+            <button id="startBtn" class="w-full max-w-xs py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-pink-600 font-orbitron font-black text-lg tracking-wider text-white shadow-xl hover:brightness-110 active:scale-95 transition">
+                START ASCENT
+            </button>
+
+            <!-- Shop & High Score Row -->
+            <div class="flex gap-3 justify-center max-w-xs mx-auto">
+                <button id="openShopBtn" class="flex-1 py-3 rounded-xl border border-yellow-500/60 bg-yellow-950/40 text-yellow-300 font-orbitron font-bold text-xs tracking-wider hover:bg-yellow-500 hover:text-black transition">
+                    💎 SHOP & UPGRADES
+                </button>
+            </div>
+
+            <div class="bg-black/50 p-3 rounded-xl border border-cyan-500/20 max-w-xs mx-auto">
+                <p class="text-xs font-orbitron text-cyan-400">HIGH SCORE</p>
+                <p id="menuHighScore" class="text-xl font-black font-orbitron text-yellow-400">0</p>
+                <p id="menuTotalGems" class="text-xs text-pink-400 font-orbitron mt-1">TOTAL GEMS: 0</p>
+            </div>
+
+            <!-- Controls guide -->
+            <div class="text-xs text-gray-400 pt-1 space-y-1">
+                <p><strong class="text-cyan-400">MOVE:</strong> A / D or Left / Right Arrows (or touch buttons)</p>
+                <p><strong class="text-pink-400">JUMP / DOUBLE JUMP:</strong> Space, W, or Up Arrow</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Modal -->
+    <div id="shopScreen" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-6 hidden">
+        <div class="w-full max-w-lg bg-gray-950/90 border border-yellow-500/40 p-6 md:p-8 rounded-2xl neon-box-cyan flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-yellow-500/30 pb-3">
+                <h2 class="text-2xl md:text-3xl font-black font-orbitron text-yellow-400">NEON SHOP</h2>
+                <div class="flex items-center gap-2 bg-pink-950/60 border border-pink-500/40 px-3 py-1 rounded-lg">
+                    <span class="text-xs font-orbitron text-pink-400">BANK:</span>
+                    <span id="shopGemsBank" class="text-base font-bold font-orbitron text-pink-300">0 💎</span>
+                </div>
+            </div>
+
+            <!-- Upgrade Section -->
+            <div class="space-y-3">
+                <h3 class="text-sm font-orbitron text-cyan-400 tracking-wider">MAX RESPAWNS UPGRADE</h3>
+                <div class="flex justify-between items-center bg-black/60 border border-cyan-500/30 p-4 rounded-xl">
+                    <div>
+                        <p id="shopRespawnLevelText" class="font-bold text-white font-orbitron text-sm">Max Respawns: 3 / Run</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Increases total checkpoint respawns per run.</p>
+                    </div>
+                    <button id="buyRespawnBtn" class="px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-600 font-orbitron font-bold text-xs text-black transition hover:brightness-110 active:scale-95">
+                        BUY (10 💎)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cosmetic Skins Section -->
+            <div class="space-y-3">
+                <h3 class="text-sm font-orbitron text-pink-400 tracking-wider">AURA & SKIN PALETTES</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="skinGrid">
+                    <!-- Skin Cards generated dynamically -->
+                </div>
+            </div>
+
+            <button id="closeShopBtn" class="w-full py-3 mt-2 rounded-xl border border-gray-600 text-gray-300 font-orbitron font-bold text-xs tracking-wider hover:bg-gray-800 transition">
+                BACK TO MENU
+            </button>
+        </div>
+    </div>
+
+    <!-- Pause Menu Modal -->
+    <div id="pauseScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md p-6 hidden">
+        <div class="text-center max-w-sm mx-auto space-y-6 bg-gray-950/80 border border-cyan-500/30 p-8 rounded-2xl neon-box-cyan">
+            <h2 class="text-3xl font-black font-orbitron text-cyan-400">GAME PAUSED</h2>
+            <div class="space-y-3">
+                <button id="resumeBtn" class="w-full py-3 rounded-xl bg-cyan-500 text-black font-orbitron font-bold tracking-wider hover:bg-cyan-400 transition">
+                    RESUME
+                </button>
+                <button id="restartBtn" class="w-full py-3 rounded-xl border border-pink-500 text-pink-400 font-orbitron font-bold tracking-wider hover:bg-pink-950/50 transition">
+                    RESTART
+                </button>
+                <button id="soundToggleBtn" class="w-full py-3 rounded-xl border border-gray-700 text-gray-300 font-orbitron font-bold tracking-wider hover:bg-gray-800 transition">
+                    AUDIO: ON
+                </button>
+                <button id="quitBtn" class="w-full py-3 rounded-xl border border-red-500/50 text-red-400 font-orbitron font-bold tracking-wider hover:bg-red-950/50 transition">
+                    MAIN MENU
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over / Checkpoint Reset Modal -->
+    <div id="gameOverScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md p-6 hidden">
+        <div class="text-center max-w-md mx-auto space-y-6 bg-gray-950/90 border border-pink-500/40 p-8 rounded-2xl neon-box-pink">
+            <h2 id="gameOverTitle" class="text-3xl md:text-4xl font-black font-orbitron text-pink-500 neon-glow-pink">ANOMALY ENCOUNTERED</h2>
+            <p id="gameOverDesc" class="text-gray-300 text-sm">You fell into the abyss or hit lethal spikes!</p>
+            
+            <div class="bg-black/50 p-4 rounded-xl border border-cyan-500/20 grid grid-cols-3 gap-2 text-center">
+                <div>
+                    <span class="text-xs text-cyan-400 font-orbitron">HEIGHT</span>
+                    <p id="endHeight" class="text-lg font-bold font-orbitron">0m</p>
+                </div>
+                <div>
+                    <span class="text-xs text-yellow-400 font-orbitron">FINAL SCORE</span>
+                    <p id="endScore" class="text-lg font-bold font-orbitron text-yellow-300">0</p>
+                </div>
+                <div>
+                    <span class="text-xs text-pink-400 font-orbitron">GEMS GATHERED</span>
+                    <p id="endGems" class="text-lg font-bold font-orbitron text-pink-400">0</p>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <button id="respawnBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-orbitron font-black tracking-wider shadow-lg hover:brightness-110 transition">
+                    RESPAWN AT CHECKPOINT (<span id="respawnLeftCount">0</span> LEFT)
+                </button>
+                <button id="fullRestartBtn" class="w-full py-3 rounded-xl border border-pink-500 text-pink-400 font-orbitron font-bold tracking-wider hover:bg-pink-950/50 transition">
+                    RESTART ASCENT
+                </button>
+                <button id="endMainMenuBtn" class="w-full py-3 rounded-xl border border-gray-700 text-gray-400 font-orbitron font-bold tracking-wider hover:bg-gray-800 transition">
+                    MAIN MENU
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Engine Script -->
+    <script>
+        // --- AUDIO MANAGER (Web Audio API) ---
+        class AudioManager {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type, duration, gainValue = 0.1) {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    
+                    gain.gain.setValueAtTime(gainValue, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
+            }
+
+            jump() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+                    
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e) {}
+            }
+
+            doubleJump() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.2);
+                    
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.2);
+                } catch(e) {}
+            }
+
+            gem() {
+                this.playTone(880, 'sine', 0.1, 0.1);
+                setTimeout(() => this.playTone(1320, 'sine', 0.15, 0.1), 80);
+            }
+
+            spike() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(50, this.ctx.currentTime + 0.3);
+                    
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.3);
+                } catch(e) {}
+            }
+
+            checkpoint() {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((note, idx) => {
+                    setTimeout(() => this.playTone(note, 'triangle', 0.25, 0.12), idx * 80);
+                });
+            }
+
+            buy() {
+                this.playTone(600, 'sine', 0.1, 0.15);
+                setTimeout(() => this.playTone(900, 'sine', 0.2, 0.15), 100);
+            }
+        }
+
+        const audioManager = new AudioManager();
+
+        // --- LOCAL STORAGE & PERSISTENCE ---
+        let totalGemsBank = parseInt(localStorage.getItem('na_gems') || '0', 10);
+        let highScore = parseInt(localStorage.getItem('na_highscore') || '0', 10);
+        let respawnLevel = parseInt(localStorage.getItem('na_respawn_level') || '0', 10); // 0 = 3 max, 1 = 4 max, etc.
+        let activeSkinId = localStorage.getItem('na_active_skin') || 'cyan';
+
+        const skins = [
+            { id: 'cyan', name: 'Cyber Cyan', color: '#00f0ff', glow: '#00f0ff', cost: 0 },
+            { id: 'magenta', name: 'Synth Magenta', color: '#ff007f', glow: '#ff007f', cost: 25 },
+            { id: 'gold', name: 'Golden Glow', color: '#ffd700', glow: '#ffd700', cost: 50 },
+            { id: 'emerald', name: 'Plasma Green', color: '#00ff66', glow: '#00ff66', cost: 80 }
+        ];
+
+        let unlockedSkins = JSON.parse(localStorage.getItem('na_unlocked_skins') || '["cyan"]');
+
+        function saveUserData() {
+            localStorage.setItem('na_gems', totalGemsBank.toString());
+            localStorage.setItem('na_highscore', highScore.toString());
+            localStorage.setItem('na_respawn_level', respawnLevel.toString());
+            localStorage.setItem('na_active_skin', activeSkinId);
+            localStorage.setItem('na_unlocked_skins', JSON.stringify(unlockedSkins));
+            updateMenuStats();
+        }
+
+        function getRespawnCost(level) {
+            // Cost scale: Level 0->1: 10, 1->2: 30, 2->3: 50, 3->4: 80, 4->5: 120, etc.
+            const baseCosts = [10, 30, 50, 80, 120, 170, 230, 300];
+            if (level < baseCosts.length) return baseCosts[level];
+            return 300 + (level - 7) * 100;
+        }
+
+        function getMaxRespawns() {
+            return 3 + respawnLevel;
+        }
+
+        // --- GAME STATE & CONFIG ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'START'; // START, PLAYING, PAUSED, GAMEOVER
+        let difficulty = 'normal'; // easy, normal, hard
+        let rawScore = 0;
+        let finalScore = 0;
+        let heightMeters = 0;
+        let runGemsCollected = 0;
+        let maxCamY = 0;
+
+        let respawnsRemaining = 3;
+
+        // Difficulty configurations
+        const diffConfigs = {
+            easy: { platformSpacing: 110, spikeChance: 0.1, gravity: 0.45, jumpPower: -11, multiplier: 0.5 },
+            normal: { platformSpacing: 95, spikeChance: 0.22, gravity: 0.5, jumpPower: -11.5, multiplier: 1.0 },
+            hard: { platformSpacing: 85, spikeChance: 0.35, gravity: 0.55, jumpPower: -12, multiplier: 1.5 }
+        };
+
+        let currentDiffConfig = diffConfigs.normal;
+
+        // Input state
+        const keys = { left: false, right: false, jump: false, jumpPressedThisFrame: false };
+
+        // Player object
+        let player = {
+            x: 0,
+            y: 0,
+            width: 32,
+            height: 44,
+            vx: 0,
+            vy: 0,
+            speed: 4.5,
+            grounded: false,
+            doubleJumpAvailable: true,
+            facing: 1, // 1 right, -1 left
+            squashX: 1,
+            squashY: 1,
+            color: '#00f0ff'
+        };
+
+        // Checkpoint state
+        let checkpoint = {
+            x: 0,
+            y: 0,
+            active: false
+        };
+
+        let platforms = [];
+        let collectibles = [];
+        let particles = [];
+        let bgStars = [];
+        let gridOffset = 0;
+
+        // Resize handler
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function updateMenuStats() {
+            document.getElementById('menuHighScore').innerText = highScore;
+            document.getElementById('menuTotalGems').innerText = `TOTAL GEMS: ${totalGemsBank}`;
+            document.getElementById('shopGemsBank').innerText = `${totalGemsBank} 💎`;
+        }
+        updateMenuStats();
+
+        // Initialize background stars
+        function initBgStars() {
+            bgStars = [];
+            for (let i = 0; i < 80; i++) {
+                bgStars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.5,
+                    speed: Math.random() * 0.5 + 0.2,
+                    alpha: Math.random() * 0.7 + 0.3
+                });
+            }
+        }
+        initBgStars();
+
+        // --- PARTICLE SYSTEM ---
+        function spawnParticles(x, y, count, color, speedFactor = 1) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = (Math.random() * 3 + 1) * speedFactor;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: Math.random() * 4 + 2,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.015
+                });
+            }
+        }
+
+        // --- PROCEDURAL PLATFORM GENERATION ---
+        function generateInitialPlatforms() {
+            platforms = [];
+            collectibles = [];
+            
+            const startPlatform = {
+                x: canvas.width / 2 - 100,
+                y: canvas.height - 120,
+                width: 200,
+                height: 20,
+                type: 'solid',
+                hasSpikes: false,
+                spikeOffset: 0,
+                spikeCount: 0
+            };
+            platforms.push(startPlatform);
+
+            const activeSkin = skins.find(s => s.id === activeSkinId) || skins[0];
+            player.color = activeSkin.color;
+            player.x = startPlatform.x + startPlatform.width / 2 - player.width / 2;
+            player.y = startPlatform.y - player.height;
+            player.vx = 0;
+            player.vy = 0;
+            maxCamY = player.y;
+
+            checkpoint.x = startPlatform.x + startPlatform.width / 2;
+            checkpoint.y = startPlatform.y;
+            checkpoint.active = true;
+
+            let currentY = startPlatform.y - currentDiffConfig.platformSpacing;
+            let topGenY = -3000;
+
+            while (currentY > topGenY) {
+                spawnPlatformRow(currentY);
+                currentY -= currentDiffConfig.platformSpacing + (Math.random() * 20 - 10);
+            }
+        }
+
+        function spawnPlatformRow(y) {
+            const minWidth = 100;
+            const maxWidth = 160;
+            const width = Math.random() * (maxWidth - minWidth) + minWidth;
+            const margin = 50;
+            const x = Math.random() * (canvas.width - width - margin * 2) + margin;
+
+            const randType = Math.random();
+            let type = 'solid';
+            let hasSpikes = false;
+            let spikeOffset = 0;
+            let spikeCount = 0;
+
+            if (randType < 0.12 && Math.abs(y - checkpoint.y) > 400) {
+                type = 'checkpoint';
+            } else if (Math.random() < currentDiffConfig.spikeChance) {
+                hasSpikes = true;
+                const spikeWidth = 12;
+                const maxSpikesOnPlatform = Math.floor(width / spikeWidth);
+                const currentHeight = Math.max(0, Math.floor((canvas.height - 120 - y) / 10));
+
+                const allowFullSpikes = (difficulty === 'hard' || currentHeight > 150) && Math.random() < 0.25;
+
+                if (allowFullSpikes) {
+                    spikeOffset = 0;
+                    spikeCount = maxSpikesOnPlatform;
+                } else {
+                    spikeCount = Math.max(1, Math.floor(maxSpikesOnPlatform * (0.3 + Math.random() * 0.2)));
+                    const placement = Math.random();
+                    if (placement < 0.33) {
+                        spikeOffset = 0;
+                    } else if (placement < 0.66) {
+                        spikeOffset = Math.floor((maxSpikesOnPlatform - spikeCount) / 2) * spikeWidth;
+                    } else {
+                        spikeOffset = (maxSpikesOnPlatform - spikeCount) * spikeWidth;
+                    }
+                }
+            }
+
+            platforms.push({
+                x: x,
+                y: y,
+                width: width,
+                height: 18,
+                type: type,
+                hasSpikes: hasSpikes,
+                spikeOffset: spikeOffset,
+                spikeCount: spikeCount
+            });
+
+            if (Math.random() < 0.65 && type !== 'checkpoint') {
+                let gemX = x + width / 2;
+                if (hasSpikes) {
+                    gemX = (spikeOffset === 0) ? x + width - 20 : x + 20;
+                }
+                collectibles.push({
+                    x: gemX,
+                    y: y - 35,
+                    radius: 8,
+                    collected: false,
+                    floatOffset: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        function checkAndExtendPlatforms() {
+            let highestY = Math.min(...platforms.map(p => p.y));
+            const targetHeight = player.y - canvas.height;
+            if (highestY > targetHeight) {
+                let currentY = highestY - currentDiffConfig.platformSpacing;
+                for (let i = 0; i < 8; i++) {
+                    spawnPlatformRow(currentY);
+                    currentY -= currentDiffConfig.platformSpacing + (Math.random() * 20 - 10);
+                }
+
+                platforms = platforms.filter(p => p.y < player.y + canvas.height + 200);
+                collectibles = collectibles.filter(c => c.y < player.y + canvas.height + 200);
+            }
+        }
+
+        // --- INPUT LISTENERS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') { keys.left = true; player.facing = -1; }
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') { keys.right = true; player.facing = 1; }
+            if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+                if (!keys.jump) {
+                    keys.jumpPressedThisFrame = true;
+                }
+                keys.jump = true;
+                e.preventDefault();
+            }
+            if (e.code === 'KeyP' && gameState === 'PLAYING') {
+                togglePause();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = false;
+        });
+
+        const setupTouchButton = (id, keyName) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (keyName === 'jump') {
+                    keys.jumpPressedThisFrame = true;
+                    keys.jump = true;
+                } else {
+                    keys[keyName] = true;
+                    if (keyName === 'left') player.facing = -1;
+                    if (keyName === 'right') player.facing = 1;
+                }
+            });
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (keyName === 'jump') {
+                    keys.jump = false;
+                } else {
+                    keys[keyName] = false;
+                }
+            });
+        };
+        setupTouchButton('touchLeft', 'left');
+        setupTouchButton('touchRight', 'right');
+        setupTouchButton('touchJump', 'jump');
+
+        // --- UI BUTTON HANDLERS ---
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('ring-2', 'ring-pink-500', 'bg-pink-950/65'));
+                btn.classList.add('ring-2', 'ring-pink-500', 'bg-pink-950/65');
+                difficulty = btn.dataset.diff;
+                currentDiffConfig = diffConfigs[difficulty];
+            });
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            audioManager.init();
+            startGame();
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', togglePause);
+        document.getElementById('resumeBtn').addEventListener('click', togglePause);
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            togglePause();
+            startGame();
+        });
+        document.getElementById('quitBtn').addEventListener('click', () => {
+            document.getElementById('pauseScreen').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('hidden');
+            gameState = 'START';
+            updateMenuStats();
+        });
+        document.getElementById('endMainMenuBtn').addEventListener('click', () => {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('hidden');
+            gameState = 'START';
+            updateMenuStats();
+        });
+
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+            audioManager.enabled = !audioManager.enabled;
+            document.getElementById('soundToggleBtn').innerText = `AUDIO: ${audioManager.enabled ? 'ON' : 'OFF'}`;
+        });
+
+        document.getElementById('respawnBtn').addEventListener('click', () => {
+            if (respawnsRemaining > 0 && checkpoint.active) {
+                respawnsRemaining--;
+                respawnAtIndex();
+            }
+        });
+
+        document.getElementById('fullRestartBtn').addEventListener('click', () => {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            startGame();
+        });
+
+        // SHOP UI
+        function renderShopUI() {
+            document.getElementById('shopGemsBank').innerText = `${totalGemsBank} 💎`;
+            
+            // Respawn Upgrade
+            const maxR = getMaxRespawns();
+            const costR = getRespawnCost(respawnLevel);
+            document.getElementById('shopRespawnLevelText').innerText = `Max Respawns: ${maxR} / Run`;
+            document.getElementById('buyRespawnBtn').innerText = `BUY (${costR} 💎)`;
+
+            // Skins Grid
+            const skinGrid = document.getElementById('skinGrid');
+            skinGrid.innerHTML = '';
+            skins.forEach(skin => {
+                const isUnlocked = unlockedSkins.includes(skin.id);
+                const isEquipped = activeSkinId === skin.id;
+
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-xl border flex justify-between items-center bg-black/60 ${isEquipped ? 'border-cyan-400 ring-1 ring-cyan-400' : 'border-gray-800'}`;
+                
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-6 h-8 rounded-md border" style="background-color: ${skin.color}; border-color: ${skin.glow}"></div>
+                        <div>
+                            <p class="font-orbitron font-bold text-xs text-white">${skin.name}</p>
+                            <p class="text-[10px] text-gray-400">${isUnlocked ? (isEquipped ? 'Equipped' : 'Unlocked') : `${skin.cost} 💎`}</p>
+                        </div>
+                    </div>
+                    <button class="skin-btn px-3 py-1.5 rounded-lg text-xs font-orbitron font-bold transition" data-id="${skin.id}">
+                        ${isEquipped ? 'ACTIVE' : (isUnlocked ? 'EQUIP' : 'UNLOCK')}
+                    </button>
+                `;
+
+                const btn = card.querySelector('.skin-btn');
+                if (isEquipped) {
+                    btn.className += ' bg-cyan-500 text-black cursor-default';
+                } else if (isUnlocked) {
+                    btn.className += ' bg-gray-700 hover:bg-gray-600 text-white';
+                } else {
+                    btn.className += ' bg-yellow-500 hover:bg-yellow-400 text-black';
+                }
+
+                btn.addEventListener('click', () => {
+                    if (isEquipped) return;
+                    if (isUnlocked) {
+                        activeSkinId = skin.id;
+                        saveUserData();
+                        renderShopUI();
+                    } else if (totalGemsBank >= skin.cost) {
+                        totalGemsBank -= skin.cost;
+                        unlockedSkins.push(skin.id);
+                        activeSkinId = skin.id;
+                        audioManager.buy();
+                        saveUserData();
+                        renderShopUI();
+                    }
+                });
+
+                skinGrid.appendChild(card);
+            });
+        }
+
+        document.getElementById('openShopBtn').addEventListener('click', () => {
+            renderShopUI();
+            document.getElementById('shopScreen').classList.remove('hidden');
+        });
+
+        document.getElementById('closeShopBtn').addEventListener('click', () => {
+            document.getElementById('shopScreen').classList.add('hidden');
+            updateMenuStats();
+        });
+
+        document.getElementById('buyRespawnBtn').addEventListener('click', () => {
+            const cost = getRespawnCost(respawnLevel);
+            if (totalGemsBank >= cost) {
+                totalGemsBank -= cost;
+                respawnLevel++;
+                audioManager.buy();
+                saveUserData();
+                renderShopUI();
+            }
+        });
+
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                document.getElementById('pauseScreen').classList.remove('hidden');
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                document.getElementById('pauseScreen').classList.add('hidden');
+            }
+        }
+
+        function renderRespawnsUI() {
+            const heartsContainer = document.getElementById('respawnHearts');
+            heartsContainer.innerHTML = '';
+            const maxR = getMaxRespawns();
+            for (let i = 0; i < maxR; i++) {
+                const heart = document.createElement('span');
+                if (i < respawnsRemaining) {
+                    heart.innerHTML = '❤️';
+                    heart.className = 'animate-pulse';
+                } else {
+                    heart.innerHTML = '🖤';
+                    heart.className = 'opacity-40';
+                }
+                heartsContainer.appendChild(heart);
+            }
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('pauseScreen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+
+            rawScore = 0;
+            finalScore = 0;
+            heightMeters = 0;
+            runGemsCollected = 0;
+            maxCamY = 0;
+
+            respawnsRemaining = getMaxRespawns();
+            renderRespawnsUI();
+
+            generateInitialPlatforms();
+            gameState = 'PLAYING';
+        }
+
+        function respawnAtIndex() {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            player.x = checkpoint.x - player.width / 2;
+            player.y = checkpoint.y - player.height - 10;
+            player.vx = 0;
+            player.vy = 0;
+            player.doubleJumpAvailable = true;
+            renderRespawnsUI();
+            spawnParticles(player.x + player.width / 2, player.y + player.height / 2, 25, '#00f0ff', 1.5);
+            gameState = 'PLAYING';
+        }
+
+        function triggerGameOver(reason) {
+            gameState = 'GAMEOVER';
+            audioManager.spike();
+
+            // Save Gems to Bank
+            totalGemsBank += runGemsCollected;
+
+            // Save High Score
+            if (finalScore > highScore) {
+                highScore = finalScore;
+            }
+            saveUserData();
+
+            const respawnBtn = document.getElementById('respawnBtn');
+            const respawnLeftCount = document.getElementById('respawnLeftCount');
+            respawnLeftCount.innerText = respawnsRemaining;
+
+            if (respawnsRemaining > 0 && checkpoint.active) {
+                respawnBtn.classList.remove('hidden');
+                document.getElementById('gameOverTitle').innerText = reason === 'spikes' ? 'SPIKE IMPACT' : 'FALLEN';
+                document.getElementById('gameOverDesc').innerText = `You have ${respawnsRemaining} respawn(s) remaining for this run.`;
+            } else {
+                respawnBtn.classList.add('hidden');
+                document.getElementById('gameOverTitle').innerText = 'ASCENT FAILED';
+                document.getElementById('gameOverDesc').innerText = respawnsRemaining === 0 ? 'No respawns left! Maximum deaths reached for this run.' : 'No checkpoint reached!';
+            }
+
+            document.getElementById('endHeight').innerText = `${Math.floor(heightMeters)}m`;
+            document.getElementById('endScore').innerText = finalScore;
+            document.getElementById('endGems').innerText = runGemsCollected;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        // --- GAME UPDATE LOOP ---
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            // Horizontal Movement
+            if (keys.left) {
+                player.vx = -player.speed;
+                player.facing = -1;
+            } else if (keys.right) {
+                player.vx = player.speed;
+                player.facing = 1;
+            } else {
+                player.vx *= 0.8;
+            }
+
+            player.x += player.vx;
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+            // Gravity
+            player.vy += currentDiffConfig.gravity;
+            player.y += player.vy;
+
+            // Jump / Double Jump
+            if (keys.jumpPressedThisFrame) {
+                if (player.grounded) {
+                    player.vy = currentDiffConfig.jumpPower;
+                    player.grounded = false;
+                    player.doubleJumpAvailable = true;
+                    audioManager.jump();
+                    spawnParticles(player.x + player.width / 2, player.y + player.height, 8, player.color, 0.8);
+                    player.squashX = 0.75;
+                    player.squashY = 1.35;
+                } else if (player.doubleJumpAvailable) {
+                    player.vy = currentDiffConfig.jumpPower * 0.92;
+                    player.doubleJumpAvailable = false;
+                    audioManager.doubleJump();
+                    spawnParticles(player.x + player.width / 2, player.y + player.height / 2, 12, '#ff007f', 1.2);
+                    player.squashX = 1.3;
+                    player.squashY = 0.75;
+                }
+                keys.jumpPressedThisFrame = false;
+            }
+
+            player.squashX += (1 - player.squashX) * 0.15;
+            player.squashY += (1 - player.squashY) * 0.15;
+
+            // Platform Collisions
+            player.grounded = false;
+            for (let p of platforms) {
+                if (
+                    player.vy > 0 &&
+                    player.x + player.width > p.x &&
+                    player.x < p.x + p.width &&
+                    player.y + player.height >= p.y &&
+                    player.y + player.height - player.vy <= p.y + 12
+                ) {
+                    player.y = p.y - player.height;
+                    player.vy = 0;
+                    player.grounded = true;
+                    player.doubleJumpAvailable = true;
+
+                    if (p.hasSpikes) {
+                        const spikeWidth = 12;
+                        const spikeStartX = p.x + p.spikeOffset;
+                        const spikeEndX = spikeStartX + (p.spikeCount * spikeWidth);
+
+                        if (player.x + player.width > spikeStartX && player.x < spikeEndX) {
+                            triggerGameOver('spikes');
+                            return;
+                        }
+                    }
+
+                    if (p.type === 'checkpoint' && (!checkpoint.active || checkpoint.y !== p.y)) {
+                        checkpoint.x = p.x + p.width / 2;
+                        checkpoint.y = p.y;
+                        checkpoint.active = true;
+                        audioManager.checkpoint();
+                        spawnParticles(checkpoint.x, checkpoint.y, 20, '#00aaff', 1.5);
+                    }
+                }
+            }
+
+            // Collectibles Collision
+            for (let c of collectibles) {
+                if (!c.collected) {
+                    const dx = (player.x + player.width / 2) - c.x;
+                    const dy = (player.y + player.height / 2) - c.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < player.width / 2 + c.radius) {
+                        c.collected = true;
+                        runGemsCollected++;
+                        rawScore += 250;
+                        audioManager.gem();
+                        spawnParticles(c.x, c.y, 10, '#ffe600', 1);
+                    }
+                }
+            }
+
+            // Height & Score calculation with Difficulty Multiplier
+            const currentHeightCalc = Math.max(0, Math.floor((canvas.height - 120 - player.y) / 10));
+            if (currentHeightCalc > heightMeters) {
+                rawScore += (currentHeightCalc - heightMeters) * 10;
+                heightMeters = currentHeightCalc;
+            }
+
+            finalScore = Math.floor(rawScore * currentDiffConfig.multiplier);
+
+            // Check Abyss Death
+            const cameraY = getCameraY();
+            if (player.y > cameraY + canvas.height + 60) {
+                triggerGameOver('abyss');
+                return;
+            }
+
+            checkAndExtendPlatforms();
+
+            // Update Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let pt = particles[i];
+                pt.x += pt.vx;
+                pt.y += pt.vy;
+                pt.alpha -= pt.decay;
+                if (pt.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Update HUD elements
+            document.getElementById('hudHeight').innerText = `${heightMeters}m`;
+            document.getElementById('hudScore').innerText = `${finalScore}`;
+            document.getElementById('hudGems').innerText = runGemsCollected;
+
+            // Update Jump Indicators
+            const jump1 = document.getElementById('jump1');
+            const jump2 = document.getElementById('jump2');
+            if (player.grounded) {
+                jump1.className = "w-4 h-4 rounded-full bg-cyan-400 neon-box-cyan transition-all";
+                jump2.className = "w-4 h-4 rounded-full bg-cyan-400 neon-box-cyan transition-all";
+            } else if (player.doubleJumpAvailable) {
+                jump1.className = "w-4 h-4 rounded-full bg-cyan-400 neon-box-cyan transition-all";
+                jump2.className = "w-4 h-4 rounded-full bg-gray-700 transition-all";
+            } else {
+                jump1.className = "w-4 h-4 rounded-full bg-gray-700 transition-all";
+                jump2.className = "w-4 h-4 rounded-full bg-gray-700 transition-all";
+            }
+        }
+
+        // --- CAMERA TRACKING ---
+        function getCameraY() {
+            const targetCamY = player.y - canvas.height * 0.55;
+            maxCamY = Math.min(maxCamY, targetCamY);
+            return maxCamY;
+        }
+
+        // --- RENDER LOOP ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const camY = getCameraY();
+
+            // Background Grid & Stars
+            ctx.save();
+            gridOffset = (camY * 0.3) % 40;
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.04)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = -gridOffset; y < canvas.height; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            for (let star of bgStars) {
+                let starScreenY = (star.y - camY * star.speed) % canvas.height;
+                if (starScreenY < 0) starScreenY += canvas.height;
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+                ctx.fillRect(star.x, starScreenY, star.size, star.size);
+            }
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(0, -camY);
+
+            // Render Platforms
+            for (let p of platforms) {
+                ctx.save();
+                if (p.type === 'checkpoint') {
+                    ctx.shadowColor = '#00f0ff';
+                    ctx.shadowBlur = 15;
+                    ctx.fillStyle = '#00aaff';
+                } else {
+                    ctx.shadowColor = '#ff007f';
+                    ctx.shadowBlur = 8;
+                    ctx.fillStyle = '#201035';
+                }
+
+                ctx.beginPath();
+                ctx.roundRect(p.x, p.y, p.width, p.height, 6);
+                ctx.fill();
+
+                ctx.strokeStyle = p.type === 'checkpoint' ? '#00ffff' : '#ff007f';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                if (p.hasSpikes) {
+                    ctx.fillStyle = '#ff0055';
+                    ctx.shadowColor = '#ff0055';
+                    ctx.shadowBlur = 10;
+                    const spikeWidth = 12;
+                    const spikeHeight = 14;
+                    
+                    for (let i = 0; i < p.spikeCount; i++) {
+                        const sx = p.x + p.spikeOffset + (i * spikeWidth);
+                        const sy = p.y;
+                        ctx.beginPath();
+                        ctx.moveTo(sx, sy);
+                        ctx.lineTo(sx + spikeWidth / 2, sy - spikeHeight);
+                        ctx.lineTo(sx + spikeWidth, sy);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+
+            // Render Collectibles (Gems)
+            const time = Date.now() * 0.005;
+            for (let c of collectibles) {
+                if (!c.collected) {
+                    ctx.save();
+                    const floatY = c.y + Math.sin(time + c.floatOffset) * 5;
+                    ctx.shadowColor = '#ffe600';
+                    ctx.shadowBlur = 12;
+                    ctx.fillStyle = '#ffe600';
+
+                    ctx.beginPath();
+                    ctx.moveTo(c.x, floatY - c.radius);
+                    ctx.lineTo(c.x + c.radius, floatY);
+                    ctx.lineTo(c.x, floatY + c.radius);
+                    ctx.lineTo(c.x - c.radius, floatY);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // Render Particles
+            for (let pt of particles) {
+                ctx.save();
+                ctx.globalAlpha = pt.alpha;
+                ctx.fillStyle = pt.color;
+                ctx.shadowColor = pt.color;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Render Player
+            ctx.save();
+            ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+            ctx.scale(player.squashX, player.squashY);
+
+            ctx.shadowColor = player.color;
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = player.color;
+
+            ctx.beginPath();
+            ctx.roundRect(-player.width / 2, -player.height / 2, player.width, player.height, 8);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            const eyeOffset = player.facing === 1 ? 4 : -10;
+            ctx.fillRect(eyeOffset, -8, 6, 6);
+
+            ctx.restore();
+            ctx.restore();
+        }
+
+        // --- MAIN GAME LOOP ---
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
