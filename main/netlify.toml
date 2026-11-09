@@ -1,0 +1,9 @@
+[build]
+  command = "make all"
+  publish = "."
+
+# Keep the old file URL working
+[[redirects]]
+  from = "/neonascend.html"
+  to = "/"
+  status = 301
